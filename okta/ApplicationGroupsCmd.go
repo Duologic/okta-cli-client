@@ -19,34 +19,38 @@ func init() {
 var ListApplicationGroupAssignmentsappId string
 
 func NewListApplicationGroupAssignmentsCmd() *cobra.Command {
+	var (
+		q, expand string
+		opts      listOptions
+	)
 	cmd := &cobra.Command{
 		Use:  "listApplicationGroupAssignments",
 		Long: "List all Assigned Groups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.ApplicationGroupsAPI.ListApplicationGroupAssignments(apiClient.GetConfig().Context, ListApplicationGroupAssignmentsappId)
+			if q != "" {
+				req = req.Q(q)
+			}
+			if expand != "" {
+				req = req.Expand(expand)
+			}
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
+			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-			d, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			utils.PrettyPrintByte(d)
-			// cmd.Println(string(d))
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
 
 	cmd.Flags().StringVarP(&ListApplicationGroupAssignmentsappId, "appId", "", "", "")
 	cmd.MarkFlagRequired("appId")
+	cmd.Flags().StringVar(&q, "q", "", "Search assigned groups by name prefix")
+	cmd.Flags().StringVar(&expand, "expand", "", "Expand embedded resources (group, metadata)")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }

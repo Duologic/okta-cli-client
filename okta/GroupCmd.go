@@ -61,31 +61,52 @@ func init() {
 }
 
 func NewListGroupsCmd() *cobra.Command {
+	var (
+		q, filter, search, expand, sortBy, sortOrder string
+		opts                                         listOptions
+	)
 	cmd := &cobra.Command{
 		Use:  "lists",
 		Long: "List all Groups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.GroupAPI.ListGroups(apiClient.GetConfig().Context)
+			if q != "" {
+				req = req.Q(q)
+			}
+			if filter != "" {
+				req = req.Filter(filter)
+			}
+			if search != "" {
+				req = req.Search(search)
+			}
+			if expand != "" {
+				req = req.Expand(expand)
+			}
+			if sortBy != "" {
+				req = req.SortBy(sortBy)
+			}
+			if sortOrder != "" {
+				req = req.SortOrder(sortOrder)
+			}
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
+			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-			d, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			utils.PrettyPrintByte(d)
-			// cmd.Println(string(d))
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
+
+	cmd.Flags().StringVar(&q, "q", "", "Search groups by name prefix")
+	cmd.Flags().StringVar(&filter, "filter", "", `Filter expression, e.g. 'type eq "OKTA_GROUP"'`)
+	cmd.Flags().StringVar(&search, "search", "", `Search expression, e.g. 'profile.name sw "Engineering"'`)
+	cmd.Flags().StringVar(&expand, "expand", "", "Expand embedded resources (stats, app)")
+	cmd.Flags().StringVar(&sortBy, "sortBy", "", "Field to sort by (with --search)")
+	cmd.Flags().StringVar(&sortOrder, "sortOrder", "", "asc or desc (with --sortBy)")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }
@@ -519,34 +540,27 @@ func init() {
 var ListAssignedApplicationsForGroupgroupId string
 
 func NewListAssignedApplicationsForGroupCmd() *cobra.Command {
+	var opts listOptions
 	cmd := &cobra.Command{
 		Use:  "listAssignedApplicationsFor",
 		Long: "List all Assigned Applications",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.GroupAPI.ListAssignedApplicationsForGroup(apiClient.GetConfig().Context, ListAssignedApplicationsForGroupgroupId)
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
+			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-			d, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			utils.PrettyPrintByte(d)
-			// cmd.Println(string(d))
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
 
 	cmd.Flags().StringVarP(&ListAssignedApplicationsForGroupgroupId, "groupId", "", "", "")
 	cmd.MarkFlagRequired("groupId")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }
@@ -559,34 +573,27 @@ func init() {
 var ListGroupUsersgroupId string
 
 func NewListGroupUsersCmd() *cobra.Command {
+	var opts listOptions
 	cmd := &cobra.Command{
 		Use:  "listUsers",
 		Long: "List all Member Users",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.GroupAPI.ListGroupUsers(apiClient.GetConfig().Context, ListGroupUsersgroupId)
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
+			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-			d, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			utils.PrettyPrintByte(d)
-			// cmd.Println(string(d))
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
 
 	cmd.Flags().StringVarP(&ListGroupUsersgroupId, "groupId", "", "", "")
 	cmd.MarkFlagRequired("groupId")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }

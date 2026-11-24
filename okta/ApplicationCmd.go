@@ -61,31 +61,40 @@ func init() {
 }
 
 func NewListApplicationsCmd() *cobra.Command {
+	var (
+		q, filter, expand string
+		opts              listOptions
+	)
 	cmd := &cobra.Command{
 		Use:  "lists",
 		Long: "List all Applications",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.ApplicationAPI.ListApplications(apiClient.GetConfig().Context)
+			if q != "" {
+				req = req.Q(q)
+			}
+			if filter != "" {
+				req = req.Filter(filter)
+			}
+			if expand != "" {
+				req = req.Expand(expand)
+			}
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
+			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-			d, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			utils.PrettyPrintByte(d)
-			// cmd.Println(string(d))
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
+
+	cmd.Flags().StringVar(&q, "q", "", "Search applications by label or name prefix")
+	cmd.Flags().StringVar(&filter, "filter", "", `Filter expression, e.g. 'status eq "ACTIVE"' or 'group.id eq "00g..."'`)
+	cmd.Flags().StringVar(&expand, "expand", "", "Expand embedded resources (e.g. user/<userId>)")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }

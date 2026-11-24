@@ -70,34 +70,38 @@ func init() {
 var ListApplicationUsersappId string
 
 func NewListApplicationUsersCmd() *cobra.Command {
+	var (
+		q, expand string
+		opts      listOptions
+	)
 	cmd := &cobra.Command{
 		Use:  "list",
 		Long: "List all Application Users",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.ApplicationUsersAPI.ListApplicationUsers(apiClient.GetConfig().Context, ListApplicationUsersappId)
+			if q != "" {
+				req = req.Q(q)
+			}
+			if expand != "" {
+				req = req.Expand(expand)
+			}
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
+			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-			d, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			utils.PrettyPrintByte(d)
-			// cmd.Println(string(d))
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
 
 	cmd.Flags().StringVarP(&ListApplicationUsersappId, "appId", "", "", "")
 	cmd.MarkFlagRequired("appId")
+	cmd.Flags().StringVar(&q, "q", "", "Search app users by name or email prefix")
+	cmd.Flags().StringVar(&expand, "expand", "", "Expand embedded resources (user)")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }
