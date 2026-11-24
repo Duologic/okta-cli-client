@@ -1,8 +1,6 @@
 package okta
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/okta/okta-cli-client/utils"
@@ -62,108 +60,49 @@ func init() {
 	UserCmd.AddCommand(CreateUserCmd)
 }
 
-var (
-	ListUsersq         string
-	ListUsersafter     string
-	ListUserslimit     int32
-	ListUserssearch    string
-	ListUserssortBy    string
-	ListUserssortOrder string
-	ListUsersgetAll    bool
-)
-
 func NewListUsersCmd() *cobra.Command {
+	var (
+		q, filter, search, sortBy, sortOrder string
+		opts                                 listOptions
+	)
 	cmd := &cobra.Command{
 		Use:  "lists",
 		Long: "List all Users",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req := apiClient.UserAPI.ListUsers(apiClient.GetConfig().Context)
-
-			if ListUsersq != "" {
-				req = req.Q(ListUsersq)
+			if q != "" {
+				req = req.Q(q)
 			}
-			if ListUsersafter != "" {
-				req = req.After(ListUsersafter)
+			if filter != "" {
+				req = req.Filter(filter)
 			}
-			if ListUserslimit > 0 {
-				req = req.Limit(ListUserslimit)
+			if search != "" {
+				req = req.Search(search)
 			}
-			if ListUserssearch != "" {
-				req = req.Search(ListUserssearch)
+			if sortBy != "" {
+				req = req.SortBy(sortBy)
 			}
-			if ListUserssortBy != "" {
-				req = req.SortBy(ListUserssortBy)
+			if sortOrder != "" {
+				req = req.SortOrder(sortOrder)
 			}
-			if ListUserssortOrder != "" {
-				req = req.SortOrder(ListUserssortOrder)
+			if opts.after != "" {
+				req = req.After(opts.after)
+			}
+			if opts.limit > 0 {
+				req = req.Limit(opts.limit)
 			}
 
 			resp, err := req.Execute()
-			if err != nil {
-				if resp != nil && resp.Body != nil {
-					d, err := io.ReadAll(resp.Body)
-					if err == nil {
-						utils.PrettyPrintByte(d)
-					}
-				}
-				return err
-			}
-
-			// If --all flag is set, fetch all pages and combine results
-			if ListUsersgetAll {
-				var allUsers []interface{}
-
-				// Read first page
-				d, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return err
-				}
-
-				if len(d) > 0 {
-					var firstPageUsers []interface{}
-					err = json.Unmarshal(d, &firstPageUsers)
-					if err != nil {
-						return fmt.Errorf("error unmarshaling first page: %v", err)
-					}
-					allUsers = append(allUsers, firstPageUsers...)
-				}
-
-				// Continue with pagination
-				for resp.HasNextPage() {
-					var pageUsers []interface{}
-					resp, err = resp.Next(&pageUsers)
-					if err != nil {
-						return fmt.Errorf("error getting next page: %v", err)
-					}
-					allUsers = append(allUsers, pageUsers...)
-				}
-
-				// Output all users as a single JSON array
-				allUsersJSON, err := json.MarshalIndent(allUsers, "", "  ")
-				if err != nil {
-					return fmt.Errorf("error marshaling all users: %v", err)
-				}
-				fmt.Println(string(allUsersJSON))
-			} else {
-				// For single page requests, just read and print
-				d, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return err
-				}
-				utils.PrettyPrintByte(d)
-			}
-
-			return nil
+			return printList(cmd, httpResponse(resp), err, opts.all)
 		},
 	}
 
-	cmd.Flags().StringVarP(&ListUsersq, "q", "", "", "Finds a user that matches firstName, lastName, and email properties")
-	cmd.Flags().StringVarP(&ListUsersafter, "after", "", "", "The cursor to use for pagination")
-	cmd.Flags().Int32VarP(&ListUserslimit, "limit", "", 0, "Specifies the number of results returned")
-	cmd.Flags().StringVarP(&ListUserssearch, "search", "", "", "Searches for users with a supported filtering expression")
-	cmd.Flags().StringVarP(&ListUserssortBy, "sort-by", "", "", "Sort by property")
-	cmd.Flags().StringVarP(&ListUserssortOrder, "sort-order", "", "", "Sort order (asc/desc)")
-	cmd.Flags().BoolVarP(&ListUsersgetAll, "all", "", false, "Fetch all users across all pages (use with caution for large datasets)")
+	cmd.Flags().StringVar(&q, "q", "", "Search users by firstName, lastName or email prefix")
+	cmd.Flags().StringVar(&filter, "filter", "", `Filter expression, e.g. 'status eq "ACTIVE"'`)
+	cmd.Flags().StringVar(&search, "search", "", `Search expression, e.g. 'profile.email eq "user@example.com"'`)
+	cmd.Flags().StringVar(&sortBy, "sortBy", "", "Field to sort by (with --search)")
+	cmd.Flags().StringVar(&sortOrder, "sortOrder", "", "asc or desc (with --sortBy)")
+	addListFlags(cmd, &opts)
 
 	return cmd
 }
